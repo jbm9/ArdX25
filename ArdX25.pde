@@ -74,6 +74,21 @@ ISR(TIMER2_COMPA_vect) { // baud clock
 
 
 
+void dumpstate(char *name) {
+  Serial.print("======= ");
+  Serial.println(name);
+
+  Serial.print("OCR1A=");
+  Serial.println(OCR1A,10);
+
+  Serial.print("TCCR1A=");
+  Serial.println(TCCR1A, 16);
+  Serial.print("TCCR1B=");
+  Serial.println(TCCR1B, 16);
+  Serial.print("TCCR1C=");
+  Serial.println(TCCR1C, 16);
+
+}
 
 
 void setup() {
@@ -81,6 +96,8 @@ void setup() {
 
   delay(100);
   Serial.println("Starting up.");
+
+  dumpstate("STARTUP");
 
   delay(100);
 
@@ -93,7 +110,7 @@ void setup() {
   bitWrite(DDRB, 3, 1); // D11: test/debug
   bitWrite(DDRB, 4, 1); // D12: test/debug
 
-
+  modulator.setup_hardware();
   /*
   cycle_leds();
   cycle_leds();
@@ -105,6 +122,8 @@ void setup() {
   baud_interrupt_setup();
 
   ENABLE_BAUD_CLK;
+
+  dumpstate("exsetup");
 }
 
 #define XMIT_EVERY 37 // how many GPGGAs between transmits
@@ -125,28 +144,33 @@ void cycle_leds() {
 
 }
 
+
 void loop() {
+  dumpstate("loop0");
   digitalWrite(PIN_APRS_DCD, 1);
-  modulator.setState(2);
-  _delay_ms(1000);
-  _delay_ms(1000);
-  _delay_ms(1000);
-  digitalWrite(PIN_APRS_DCD, 0);
-  modulator.setState(1);
-  _delay_ms(1000);
-  _delay_ms(1000);
-  _delay_ms(1000);
+  modulator.setState(XXXSTATE_MARK);
+  dumpstate("loop1");
 
-
-  return;
-  Serial.println('.');
+  _delay_ms(1000);
+  _delay_ms(1000);
+  _delay_ms(1000);
 
   digitalWrite(PIN_APRS_DCD, 0);
-  const char *msg = "Hi mom";
-  
-  modulator.enqueue((uint8_t*)msg, strlen(msg));
 
-  _delay_ms(50);
+  modulator.setState(0);
+   dumpstate("loop2");
 
-  _delay_ms(50);
+  for (uint8_t i = 0; i < 20; i++) {
+    digitalWrite(PIN_APRS_DCD, 1);
+    _delay_ms(100);
+    digitalWrite(PIN_APRS_DCD, 0);
+    _delay_ms(100);
+  }
+
+
+  modulator.setState(XXXSTATE_SPACE);
+  dumpstate("loop3");
+  _delay_ms(1000);
+  _delay_ms(1000);
+  _delay_ms(1000);
 }

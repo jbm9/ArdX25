@@ -1,5 +1,6 @@
 #include <util/delay.h>
 #include "ax25encoder.h"
+#include "avr_modulator.h"
 #include "ax25decoder.h"
 
 typedef struct rx_state {
@@ -14,29 +15,6 @@ typedef struct rx_state {
 
 } rx_state_t;
 
-typedef struct  {
-  AX25Encoder ax25e;
-
-  uint8_t sine_i;
-  uint8_t sine_count;
-
-  bool tx_dcd_lockout;
-} tx_state_t;
-
-
-#if USE_CLOSE_SINE
-static const uint8_t sine[16] = { 7, 10, 13, 14, 15, 14, 13, 10, 
-				  8,  5,  2,  1,  0,  1,  2,  5, };
-#else
-
-// This is a better fit with "sag" accounted for.
-static const uint8_t sine[16] = { 8, 11, 13, 14, 15, 14, 13, 11, 
-				  9,  6,  3,  2,  1,  2,  3,  6, };
-
-#endif
-
-
-tx_state_t tx_state;
 rx_state_t rx_state;
 
 void rx_state_setup() {
@@ -46,122 +24,129 @@ void rx_state_setup() {
   rx_state.bufpos = 0;
 }
 
-void tx_state_setup() {
-  tx_state.sine_i = 0;
-  tx_state.sine_count = 0;
-  tx_state.ax25e = AX25Encoder();
+#define PIN_GPS_RX 7
+#define PIN_GPS_LOCK 8
+#define PIN_APRS_DCD 6
+#define PIN_APRS_XMIT 13
 
-  tx_state.tx_dcd_lockout = false;
-}
-
-#define ENABLE_BAUD_CLK  bitWrite(TIMSK1, OCIE1A, 1); // p140
-#define DISABLE_BAUD_CLK bitWrite(TIMSK1, OCIE1A, 0);
+extern AVRModulator modulator; // = AVRModulator();
 
 
-#define ENABLE_TONE_CLK  bitWrite(TIMSK2, OCIE2A, 0/*XXX 1*/); bitWrite(TIMSK2, TOIE2, 1);
-#define DISABLE_TONE_CLK bitWrite(TIMSK2, OCIE2A, 0); bitWrite(TIMSK2, TOIE2, 0);
+#define ENABLE_BAUD_CLK  bitWrite(TIMSK2, OCIE2A, 1);
+#define DISABLE_BAUD_CLK bitWrite(TIMSK2, OCIE2A, 0);
 
-void tx_interrupt_setup() {
-  /* Set up timer2 for tone generation */
-
-  Serial.println("  Setting up Timer2");
-
-  // Turn off timer2 interrupts while we twiddle, p164
-  DISABLE_TONE_CLK;
-  
-  //Timer2 Settings: Timer Prescaler=8, CS22,21,20=0,1,0
-  TCCR2A = 0x00;    // See S17.11 Register Description, pp159-61
-  TCCR2B = 0x00;    // pp162-3
-
-  // Turn on a div-1 prescaler/divider: p163
-
-  bitWrite (TCCR2B, CS22, 0);
-  bitWrite (TCCR2B, CS21, 0);
-  bitWrite (TCCR2B, CS20, 1);
-  
-
-  // go to mode 2 of the generator, cmp OCRA p161,150
-  //bitWrite (TCCR2A, WGM21, 1);
-
-  // go to mode 1 of the generator, phase-correct PWM (p161,153)
-  bitWrite(TCCR2A, WGM20, 1);
-
-  // Enable PWM output on B3 (Digital11) 
-  bitWrite(DDRB, 3, 1);
-  bitWrite(TCCR2A, COM2A1, 1);
-
-  // Set an initial, conservative speed.
-  OCR2A = 15; // 25=2400*16
-
-  // End state: ready to generate tones, but not enabled
-}
 
 // RX also hooks onto the baud interrupt.
 void baud_interrupt_setup() {
   DISABLE_BAUD_CLK;
 
-  Serial.println("  Setting up Timer1");
+  Serial.println("  Setting up Timer2");
 
-  // Clear state
-  TCCR1A = 0x00;    // See S15.11 Register descriptions p135-137
-  TCCR1B = 0x00;    // p137-138
-  TCCR1C = 0x00;    // p138-139
+  // Clear out settings.
+  TCCR2A = 0x00;    // See S17.11 Register Description, pp159-61
+  TCCR2B = 0x00;    // pp162-3
 
-  // Go to mode 4/CTC of the generator, phase-correct PWM
-  bitWrite(TCCR1B, WGM12, 1);
-  //bitWrite(TCCR1A, WGM10, 1);
+  // Turn on a div-1024 prescaler/divider: p163
+  bitWrite (TCCR2B, CS22, 1);
+  bitWrite (TCCR2B, CS21, 1);
+  bitWrite (TCCR2B, CS20, 1);
 
-  // Turn on a div-8 prescaler/divider: p138
-  bitWrite (TCCR1B, CS12, 0);
-  bitWrite (TCCR1B, CS11, 1);
-  bitWrite (TCCR1B, CS10, 0);
 
-  OCR1A = 827; // 1202 Hz.  Nice.
+  // Set waveform mode to something that resets at OCR2A p161
+
+  // Currently using 2, CTC
+  bitWrite(TCCR2B, WGM22, 0);
+  bitWrite(TCCR2A, WGM21, 1);
+  bitWrite(TCCR2A, WGM20, 0);
+ 
+  // Set an initial, conservative speed.
+  OCR2A = 13-1; // 1201.923 Hz
 
   // This should be ready to go now.
 }
 
 
-ISR(TIMER1_COMPA_vect) {
-  PORTB ^= (1<<4);
+
+
+ISR(TIMER2_COMPA_vect) { // baud clock
+  // modulator.nextBit();
 }
 
 
-ISR(TIMER2_OVF_vect) {
-  OCR2A = sine[tx_state.sine_i] << 4;
-  tx_state.sine_i = (tx_state.sine_i+1)%16;
-}
 
-ISR(TIMER2_COMPA_vect) {
-  if (tx_state.sine_count == 0 || tx_state.sine_count == sine[tx_state.sine_i])
-    PORTB ^= (1<<5);
-  tx_state.sine_count = (tx_state.sine_count+1) % 16;
-  if (0 == tx_state.sine_count) tx_state.sine_i = (tx_state.sine_i+1)%16;
 
-}
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(57600);
 
-  bitWrite(DDRB, 3, 1);
-  bitWrite(DDRB, 4, 1);
-  bitWrite(DDRB, 5, 1);
+  delay(100);
+  Serial.println("Starting up.");
 
-  tx_state_setup();
+  delay(100);
+
+  bitWrite(DDRD, 6, 1); // D6: APRS_DCD
+  bitWrite(DDRD, 7, 1); // D7: GPS_RX
+  bitWrite(DDRB, 0, 1); // D8: GPS_LOCK
+  bitWrite(DDRB, 5, 1); // D13: APRS_XMIT
+
+  bitWrite(DDRB, 1, 1); // D9: Analog output
+  bitWrite(DDRB, 3, 1); // D11: test/debug
+  bitWrite(DDRB, 4, 1); // D12: test/debug
+
+
+  /*
+  cycle_leds();
+  cycle_leds();
+  */
+
+
   rx_state_setup();
-
-  tx_interrupt_setup();
 
   baud_interrupt_setup();
 
-  ENABLE_TONE_CLK;
   ENABLE_BAUD_CLK;
 }
 
+#define XMIT_EVERY 37 // how many GPGGAs between transmits
+
+void cycle_leds() {
+  Serial.println("foo");
+  uint8_t pins[] = { PIN_GPS_RX, PIN_GPS_LOCK, PIN_APRS_DCD, PIN_APRS_XMIT };
+
+  for (uint8_t i = 0; i < sizeof(pins)/sizeof(pins[0]); i++) {
+    digitalWrite(pins[i], 1);
+    _delay_ms(100);
+  }
+  _delay_ms(2000);
+  for (uint8_t i = 0; i < sizeof(pins)/sizeof(pins[0]); i++) {
+    digitalWrite(pins[i], 0);
+    _delay_ms(100);
+  }
+
+}
+
 void loop() {
-  _delay_ms(100);
-  _delay_ms(100);
-  _delay_ms(100);
-  _delay_ms(100);
-  _delay_ms(100);
+  digitalWrite(PIN_APRS_DCD, 1);
+  modulator.setState(2);
+  _delay_ms(1000);
+  _delay_ms(1000);
+  _delay_ms(1000);
+  digitalWrite(PIN_APRS_DCD, 0);
+  modulator.setState(1);
+  _delay_ms(1000);
+  _delay_ms(1000);
+  _delay_ms(1000);
+
+
+  return;
+  Serial.println('.');
+
+  digitalWrite(PIN_APRS_DCD, 0);
+  const char *msg = "Hi mom";
+  
+  modulator.enqueue((uint8_t*)msg, strlen(msg));
+
+  _delay_ms(50);
+
+  _delay_ms(50);
 }

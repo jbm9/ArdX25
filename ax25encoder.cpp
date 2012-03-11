@@ -31,6 +31,10 @@ void AX25Encoder::enqueue(uint8_t *inbuf, uint16_t blen) {
   flagrem = HEAD_FLAGS;
 }
 
+bool AX25Encoder::inSend() {
+  return !(bufpos == buflen && flagrem == 0);
+}
+
 // @export nextstate
 uint8_t AX25Encoder::nextState() {
   uint8_t curbit;

@@ -12,6 +12,7 @@ public:
   AX25Encoder();
   void enqueue(uint8_t*, uint16_t);
   uint8_t nextState();
+  bool inSend();
 
 private:
   uint8_t *buf;

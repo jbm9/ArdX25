@@ -1,4 +1,5 @@
 *.o
+*~
 test_ax25decoder
 artifacts/
 logs/

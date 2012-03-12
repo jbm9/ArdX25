@@ -1,4 +1,5 @@
 #include <avr/io.h>
+#include <util/delay.h>
 #include <avr/interrupt.h>
 #include "avr_modulator.h"
 
@@ -14,8 +15,8 @@ extern HardwareSerial Serial;
 
 AVRModulator modulator = AVRModulator();
 
-#define ENABLE_TONE_CLK  bitWrite(TIMSK1, OCIE1A, 1); bitWrite(PORTB, 5, 1);
-#define DISABLE_TONE_CLK bitWrite(TIMSK1, OCIE1A, 0); bitWrite(PORTB, 5, 0);
+#define ENABLE_TONE_CLK  { bitWrite(TIMSK1, OCIE1A, 1); bitWrite(PORTB, 5, 1); }
+#define DISABLE_TONE_CLK { bitWrite(TIMSK1, OCIE1A, 0); bitWrite(PORTB, 5, 0);  bitWrite(PORTB, 1, 0); }
 
 
 AVRModulator::AVRModulator() {
@@ -59,13 +60,19 @@ void AVRModulator::enqueue(uint8_t *buf, uint16_t buflen) {
 }
 
 
-#define PHASE_SPEED_MARK  101
-#define PHASE_SPEED_SPACE  56
+#define PHASE_SPEED_MARK   101
+#define PHASE_SPEED_SPACE    56
 
 
 void AVRModulator::setState(uint8_t v) {
-  if (v != 0 && !bitRead(TIMSK1, OCIE1A))
+  digitalWrite(12, v);
+
+  if (v != 0 && !bitRead(TIMSK1, OCIE1A)) {
+    bitWrite(PORTB, 1, 1); // charge cap.
+    _delay_ms(2);
     ENABLE_TONE_CLK;
+    
+  }
 
   if (v == XXXSTATE_MARK) {
     OCR1A = PHASE_SPEED_MARK;
@@ -74,7 +81,12 @@ void AVRModulator::setState(uint8_t v) {
   } else if (v == 0) {
     DISABLE_TONE_CLK;
   }
+
+  if (TCNT1 > OCR1A) {
+    TCNT1 = TCNT1 >> 1;
+  }
 }
+
 
 bool AVRModulator::nextBit() {
   uint8_t v = ax25e.nextState();
@@ -84,6 +96,7 @@ bool AVRModulator::nextBit() {
 
 ISR(TIMER1_COMPA_vect) {
   PORTB ^= 1<<1;
+  //  TCNT1 = 0;
 }
 
 

@@ -8,9 +8,9 @@
 
 #include "FCS.h"
 
-#define DESTINATION "xxxxxxx"
-#define CALLSIGN "yyyyyyyy"
-#define REPEATER "zzzzzzz"
+#define DESTINATION "APZ1110"
+#define CALLSIGN "AJ9BM ;"
+#define REPEATER "WIDE2 2"
 
 /**
  * hdlc_frame -- Prepare an AX.25 frame for transmission.
@@ -203,7 +203,7 @@ void cycle_leds() {
 
 
 void setup() {
-  Serial.begin(57600);
+  Serial.begin(4800);
 
   delay(100);
   Serial.println("Starting up.");
@@ -234,7 +234,6 @@ void setup() {
   modulator.setState(0);
 
 
-
   rx_state_setup();
 
   baud_interrupt_setup();
@@ -244,17 +243,86 @@ void setup() {
   dumpstate("exsetup");
 }
 
-#define XMIT_EVERY 37 // how many GPGGAs between transmits
+
+#define XMIT_EVERY 3 // how many GPGGAs between transmits
+#define BUFLEN 100
+
+class GPSHandler {
+public:
+  uint8_t rx_count;
+
+  uint8_t state;
+  uint8_t expression[6];
+  uint8_t bufpos;
+  uint8_t buf[BUFLEN];
+
+  GPSHandler() {
+    memcpy(expression, "$GPGGA", 6);
+    bufpos = 0;
+    rx_count = 0;
+    state = 0;
+  }
+
+  bool saw(uint8_t x) {
+    bool retval = false;
+
+    if (state < 6) {
+      if (x == expression[state]) {
+	state++;
+	buf[bufpos] = x;
+	bufpos++;
+      } else {
+	state = 0;
+	bufpos = 0;
+      }
+      return false;
+    }
+  
+    if (bufpos >= BUFLEN-1 || '$' == x || '\n' == x) { // got terminus
+      if (bufpos > 6) {
+	buf[bufpos] = '\0';
+	rx_count = (rx_count+1) % XMIT_EVERY;
+
+	if (0 == rx_count) {
+	  retval = true;
+	}     
+      }
+
+      state = ('$' == x); // 0 on newline, 1 on $
+    } else {
+      buf[bufpos] = x;
+      bufpos++;
+    }
+    return retval;
+  }
+  
+};
+
+
+GPSHandler gpsh = GPSHandler();
+
+uint8_t gps_rx_lights = 0;
 
 void loop() {
-  const char *packet = "AJ9BM test packet";
-
-  uint8_t xmit[100];
+  int x = Serial.read();
  
-  uint16_t pos = hdlc_frame(xmit, (const uint8_t *)packet, strlen(packet));
+  if (-1 != x) {
+    Serial.print((char)x);
+    if (gpsh.saw(x & 0xFF)) {
+      Serial.println("==========");
+      Serial.println((char*)gpsh.buf);
+      Serial.println("==========");
 
-  modulator.enqueue((uint8_t*)packet, strlen(packet) );
-  modulator.enqueue(xmit, pos );
+      uint8_t xmit[150];
+      uint16_t pos = hdlc_frame(xmit, (const uint8_t *)gpsh.buf, gpsh.bufpos);
+      gpsh.bufpos = 0;
+      modulator.enqueue(xmit, pos);
+    }
+    gps_rx_lights = 100;
+    _delay_ms(1);
+  }
 
-  _delay_ms(1000);
+  if (gps_rx_lights) gps_rx_lights--;
+
+  digitalWrite(7, gps_rx_lights);
 }

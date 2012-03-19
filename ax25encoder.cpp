@@ -2,7 +2,7 @@
 
 // @export class_definition
 AX25Encoder::AX25Encoder() {
-  phase_state = false;
+  phase_state = true;
   buf = 0;
   bufpos = 0;
   bitpos = 0;
@@ -14,8 +14,8 @@ AX25Encoder::AX25Encoder() {
 
 // @export "foo"
 
-#define HEAD_FLAGS 3
-#define TAIL_FLAGS 2
+#define HEAD_FLAGS 100
+#define TAIL_FLAGS 50
 
 #define XXXSTATE_MARK 1
 #define XXXSTATE_SPACE 2

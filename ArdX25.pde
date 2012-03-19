@@ -244,7 +244,7 @@ void setup() {
 }
 
 
-#define XMIT_EVERY 3 // how many GPGGAs between transmits
+#define XMIT_EVERY 121 // how many GPGGAs between transmits
 #define BUFLEN 100
 
 class GPSHandler {
@@ -295,6 +295,8 @@ public:
     }
     return retval;
   }
+
+  
   
 };
 
@@ -315,6 +317,10 @@ void loop() {
 
       uint8_t xmit[150];
       uint16_t pos = hdlc_frame(xmit, (const uint8_t *)gpsh.buf, gpsh.bufpos);
+
+      //char *q = "=3745.57N112224.96W# {UIV32N}";
+      //uint16_t pos = hdlc_frame(xmit, (const uint8_t *)q, strlen(q));
+
       gpsh.bufpos = 0;
       modulator.enqueue(xmit, pos);
     }

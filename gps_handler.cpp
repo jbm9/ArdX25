@@ -3,8 +3,17 @@
 GPSHandler::GPSHandler() {
   memcpy(expression, "$GPGGA", 6);
   bufpos = 0;
-  rx_count = 0;
   state = 0;
+  lock = false;
+
+  hhmm = -1;
+  lat_whole = 500;
+  lat_frac = -1;
+
+  lon_whole = 500;
+  lon_frac = -1;
+
+  altitude = -99999;
 }
 
 bool GPSHandler::saw(uint8_t x) {
@@ -22,10 +31,10 @@ bool GPSHandler::saw(uint8_t x) {
     return false;
   }
   
-  if (bufpos >= BUFLEN-1 || '$' == x || '\n' == x) { // got terminus
+  if (bufpos >= GPSHANDLER_BUFLEN-1 || '$' == x || '\n' == x) { // got terminus
     if (bufpos > 6) {
       buf[bufpos] = '\0';
-      parse_gpgga(buf);
+      parse_gpgga((char *)buf);
       retval = true;
     }
 
@@ -66,9 +75,10 @@ void GPSHandler::parse_gpgga(char *gpgga) {
   // Extract the hour/minute timestamp; crap all over the seconds'
   // tens place to truncate atoi's return value to a manageable 16b
   q = *(gpgga+4);
-  *(gpgga+4) = '\0';
-  hhmm = atoi(gpgga);
-  *(gpgga+4) = q; 
+  
+  *(gpgga+4) = '|';
+  new_hhmm = atoi(gpgga);
+  *(gpgga+4) = q;
   ADVANCE_PAST(gpgga, ','); // timestamp
 
   // Extract latitude, with sign
@@ -77,7 +87,7 @@ void GPSHandler::parse_gpgga(char *gpgga) {
   q = *(gpgga+2);
   *(gpgga+2) = '\0';
   new_lat_frac = atoi(gpgga);
-  gpgga+2 = q;
+  *(gpgga+2) = q;
   ADVANCE_PAST(gpgga, ',');
   if (*gpgga == 'S') new_lat_whole *= -1;
   ADVANCE_PAST(gpgga, ',');
@@ -91,11 +101,11 @@ void GPSHandler::parse_gpgga(char *gpgga) {
   new_lon_frac = atoi(gpgga);
   *(gpgga+2) = q;
   ADVANCE_PAST(gpgga, ',');
-  if (*gpgga == 'W') new_lat_whole *= -1;
+  if (*gpgga == 'W') new_lon_whole *= -1;
   ADVANCE_PAST(gpgga, ',');
 
   // Fix information
-  if (*gpgga == '0') return; // skip non-fix positions for now
+  lock = (*gpgga != '0');
 
   ADVANCE_PAST(gpgga, ',');
   // now at number of satellites; skipped.
@@ -108,7 +118,7 @@ void GPSHandler::parse_gpgga(char *gpgga) {
   // altitude
   new_altitude = atoi(gpgga); // XXX Ignores fractions
 
-  ADVANCE_PAST(','); // Now at the 'units' field, should be 'M'
+  ADVANCE_PAST(gpgga, ','); // Now at the 'units' field, should be 'M'
   if (*gpgga != 'M') return;
 
   // Don't care about the remainder of the message.

@@ -1,3 +1,6 @@
+#ifndef APRS_WEATHER_H
+#define APRS_WEATHER_H
+
 #include "gps_handler.h"
 
 class APRSWeather {
@@ -14,7 +17,7 @@ public:
   void note_temp_internal(uint8_t t);
   void note_temp_external(uint8_t t);
   void note_pressure(uint8_t t);
-  void note_acc(uint8_t, x, uint8_t y, uint8_t z);
+  void note_acc(uint8_t x, uint8_t y, uint8_t z);
 
   int8_t temp_to_fahrenheit(uint8_t t);
   int8_t temp_internal_fahrenheit();
@@ -25,3 +28,4 @@ public:
 
 };
 
+#endif

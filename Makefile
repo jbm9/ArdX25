@@ -20,5 +20,9 @@ test_gps_handler:gps_handler.o test_gps_handler.o
 	$(CC) $(CFLAGS)  -o test_gps_handler $< test_gps_handler.o  $(LDFLAGS)
 
 
+test_aprs_weather:gps_handler.o aprs_weather.o test_aprs_weather.o
+	$(CC) $(CFLAGS)  -o test_aprs_weather gps_handler.o aprs_weather.o test_aprs_weather.o  $(LDFLAGS)
+
+
 doc: *.tex *.cpp *.h .dexy
 	dexy

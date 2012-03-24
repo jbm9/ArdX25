@@ -97,11 +97,17 @@ uint16_t APRSWeather::format_string(char *buf, uint16_t maxbuf) {
   pos++;
 
   // Wind speed, which we don't have.
-  for (uint8_t i = 0; i < 7; i++) {
+  for (uint8_t i = 0; i < 3; i++) {
     *(buf+pos) = '.';
     pos++;
   }
-    
+  *(buf+pos) = '/';
+
+  // Wind heading, which we don't have.
+  for (uint8_t i = 0; i < 3; i++) {
+    *(buf+pos) = '.';
+    pos++;
+  }    
   // Pack up Weather data
 
   *(buf+pos) = 'g';
@@ -119,6 +125,7 @@ uint16_t APRSWeather::format_string(char *buf, uint16_t maxbuf) {
 
   *(buf+pos) = 'b';
   pos ++;
+
   snprintf(buf+pos, 5+1, "%04d0", pressure_millibars());
   pos += 5;
 

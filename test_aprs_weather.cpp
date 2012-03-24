@@ -76,7 +76,7 @@ SUITE(APRSWeather) {
 
       pos = aw.format_string(buf, 1024);
 
-      const char *expected_packet = ";Bacchus 9*021700z3745.57N/12224.96WO.......g...t002b04690bccs9";
+      const char *expected_packet = ";Bacchus 9*021700z3745.57N/12224.96WO.../...g...t002b04690bccs9";
       const uint16_t expected_len = strlen(expected_packet);
 
       CHECK(pos == expected_len);

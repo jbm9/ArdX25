@@ -1,8 +1,10 @@
 #include "ax25encoder.h"
 
+#define INITIAL_PHASE_STATE true
+
 // @export class_definition
 AX25Encoder::AX25Encoder() {
-  phase_state = true;
+  phase_state = INITIAL_PHASE_STATE;
   buf = 0;
   bufpos = 0;
   bitpos = 0;
@@ -29,6 +31,7 @@ void AX25Encoder::enqueue(uint8_t *inbuf, uint16_t blen) {
   buflen = blen;
   bitpos = 0;
   flagrem = HEAD_FLAGS;
+  phase_state = INITIAL_PHASE_STATE;
 }
 
 bool AX25Encoder::inSend() {

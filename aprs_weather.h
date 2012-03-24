@@ -23,6 +23,8 @@ public:
   int8_t temp_internal_fahrenheit();
   int8_t temp_external_fahrenheit();
 
+  uint16_t pressure_millibars();
+
   void note_gpgga(char *gpgga);
   uint16_t format_string(char *buf, uint16_t maxbuf);
 

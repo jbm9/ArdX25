@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include "aprs_weather.h"
 
+// Define our APRS Symbol, APRS101.pdf Appendix 2, p105 (115)
+#define SYMBOL_PAGE '/'  // main page
+#define SYMBOL_SYMBOL 'O' // Balloon!  
+
 void APRSWeather::set_gps_handler(GPSHandler *g) {
   gpsh = g;
 }
@@ -29,6 +33,7 @@ void APRSWeather::note_acc(uint8_t x, uint8_t y, uint8_t z) {
 // entire range, with a mean error of -0.018, sd=0.1898.
 int8_t APRSWeather::temp_to_fahrenheit(uint8_t t) {
   int8_t tp = t - 199;
+  if (t > 252) tp = 252-199; // this overflows a signed int
   return (2*tp + tp/3 + 2);
 }
 
@@ -40,6 +45,17 @@ int8_t APRSWeather::temp_external_fahrenheit() {
   return temp_to_fahrenheit(temp_external);
 }
 
+
+// With AREF=3.3V and V_S=5.0V (weird, but how the board has to be),
+// this formula yields a mean error of -0.017, sd=0.1238.
+//
+// Note that the maximum pressure is 82kPa, which is ~0.8atm
+//
+// returns millibars, need to tack on a zero for APRS
+uint16_t APRSWeather::pressure_millibars() {
+  uint16_t retval = 105 + 2*pressure + 3*pressure/5;
+  return retval;
+}
 
 // APRS101.pdf, Chapter 12 (p65 / PDF page 75)
 uint16_t APRSWeather::format_string(char *buf, uint16_t maxbuf) {
@@ -70,14 +86,14 @@ uint16_t APRSWeather::format_string(char *buf, uint16_t maxbuf) {
   *(buf+pos) = '/'; // TODO CHOOSE SYMBOL
   pos++;
 
-  snprintf(buf+pos, 5+1, "%04d.", abs(gpsh->lon_whole));
-  pos += 5;
+  snprintf(buf+pos, 6+1, "%05i.", abs(gpsh->lon_whole));
+  pos += 6;
   snprintf(buf+pos, 2+1, "%02d", gpsh->lon_frac);
   pos += 2;
   *(buf+pos) = (gpsh->lon_whole > 0 ? 'E' : 'W');
   pos++;
 
-  *(buf+pos) = '_'; // TODO CHOOSE SYMBOL
+  *(buf+pos) = 'O'; // TODO CHOOSE SYMBOL
   pos++;
 
   // Wind speed, which we don't have.
@@ -103,9 +119,8 @@ uint16_t APRSWeather::format_string(char *buf, uint16_t maxbuf) {
 
   *(buf+pos) = 'b';
   pos ++;
-  // XXX TODO Convert pressure into a value here.
+  snprintf(buf+pos, 5+1, "%04d0", pressure_millibars());
   pos += 5;
-
 
   *(buf+pos) = 'b'; // APRS Software Type
   pos++;

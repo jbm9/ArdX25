@@ -32,9 +32,23 @@ void APRSWeather::note_acc(uint8_t x, uint8_t y, uint8_t z) {
 // integer math only, and yields an accuracy of -1~+3 degF over the
 // entire range, with a mean error of -0.018, sd=0.1898.
 int8_t APRSWeather::temp_to_fahrenheit(uint8_t t) {
-  int8_t tp = t - 199;
+ 
+  int16_t retval = 0;
+
+#if USE_RAW_3V3_AREF
+  int16_t tp = t - 199;
   if (t > 252) tp = 252-199; // this overflows a signed int
-  return (2*tp + tp/3 + 2);
+  retval = (2*tp + tp/3 + 2);
+#else
+  // mean error 0.002, sd(epsilon)=0.037, max err is -1/+2degF
+  // 2*(a-188)+floor((a-188)/2)-floor((a-188)/20) - 3 
+
+  int16_t tp = t - 207;
+
+  retval = 2*tp + tp/5 - 1;
+#endif
+
+  return (int8_t)retval;
 }
 
 int8_t APRSWeather::temp_internal_fahrenheit() {
@@ -53,8 +67,14 @@ int8_t APRSWeather::temp_external_fahrenheit() {
 //
 // returns millibars, need to tack on a zero for APRS
 uint16_t APRSWeather::pressure_millibars() {
+#if USE_RAW_3V3_AREF
   uint16_t retval = 105 + 2*pressure + 3*pressure/5;
   return retval;
+#else
+  uint16_t q = pressure +25 ;
+  uint16_t retval = (q/2 - q/13)*10;
+  return retval;
+#endif
 }
 
 // APRS101.pdf, Chapter 12 (p65 / PDF page 75)
@@ -64,7 +84,7 @@ uint16_t APRSWeather::format_string(char *buf, uint16_t maxbuf) {
   *(buf+pos) = ';';
   pos++;
 
-  char OBJECT_NAME[9] = { 'B', 'a', 'c', 'c', 'h', 'u','s', ' ', '9' };
+  char OBJECT_NAME[9] = { 'A', 'J', '9', 'B', 'M', '-','1', '1', ' ' };
 
   memcpy((void*)(buf+pos), OBJECT_NAME, 9);
   pos += 9;
@@ -73,7 +93,7 @@ uint16_t APRSWeather::format_string(char *buf, uint16_t maxbuf) {
   pos++;
       
 
-  snprintf(buf+pos, 7+1, "%04i00z", gpsh->hhmm);
+  snprintf(buf+pos, 7+1, "%04i00h", gpsh->hhmm);
   pos += 7;
 
   snprintf(buf+pos, 5+1, "%04i.", abs(gpsh->lat_whole));
@@ -83,7 +103,7 @@ uint16_t APRSWeather::format_string(char *buf, uint16_t maxbuf) {
   *(buf+pos) = (gpsh->lat_whole > 0 ? 'N' : 'S');
   pos++;
 
-  *(buf+pos) = '/'; // TODO CHOOSE SYMBOL
+  *(buf+pos) = '/';
   pos++;
 
   snprintf(buf+pos, 6+1, "%05i.", abs(gpsh->lon_whole));
@@ -93,7 +113,7 @@ uint16_t APRSWeather::format_string(char *buf, uint16_t maxbuf) {
   *(buf+pos) = (gpsh->lon_whole > 0 ? 'E' : 'W');
   pos++;
 
-  *(buf+pos) = 'O'; // TODO CHOOSE SYMBOL
+  *(buf+pos) = '_';
   pos++;
 
   // Wind speed, which we don't have.
@@ -102,20 +122,17 @@ uint16_t APRSWeather::format_string(char *buf, uint16_t maxbuf) {
     pos++;
   }
   *(buf+pos) = '/';
+  pos++;
 
   // Wind heading, which we don't have.
   for (uint8_t i = 0; i < 3; i++) {
     *(buf+pos) = '.';
     pos++;
   }    
-  // Pack up Weather data
 
-  *(buf+pos) = 'g';
-  pos++;
-  for (uint8_t i = 0; i < 3; i++) {
-    *(buf+pos) = '.';
-    pos++;
-  }
+
+
+  // Pack up Weather data
 
   *(buf+pos) = 't';
   pos++;
@@ -128,11 +145,6 @@ uint16_t APRSWeather::format_string(char *buf, uint16_t maxbuf) {
 
   snprintf(buf+pos, 5+1, "%04d0", pressure_millibars());
   pos += 5;
-
-  *(buf+pos) = 'b'; // APRS Software Type
-  pos++;
-  memcpy(buf+pos, "ccs9", 4);
-  pos += 4;    
 
   return pos;    
 }

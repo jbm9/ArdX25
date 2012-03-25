@@ -14,6 +14,15 @@
 #define CALLSIGN "AJ9BM ;"
 #define REPEATER "WIDE2 2"
 
+#define PIN_TEMP_INTERNAL 0
+#define PIN_TEMP_EXTERNAL 1
+#define PIN_ACC_Z 2
+#define PIN_ACC_Y 3
+#define PIN_ACC_X 4
+#define PIN_PRESSURE 5
+
+
+
 /**
  * hdlc_frame -- Prepare an AX.25 frame for transmission.
  *
@@ -106,6 +115,8 @@ void rx_state_setup() {
   rx_state.obs_i = 0;
 
   rx_state.bufpos = 0;
+
+  analogReference(EXTERNAL);
 }
 
 
@@ -204,6 +215,26 @@ void cycle_leds() {
 
 
 
+
+#define XMIT_EVERY 37 // how many GPGGAs between transmits
+#define BUFLEN 100
+
+
+GPSHandler gpsh = GPSHandler();
+APRSWeather aw = APRSWeather();
+
+
+
+uint8_t gps_rx_lights = 0;
+
+uint16_t lastxmit = 0;
+
+uint16_t gpgga_seen = 0;
+// #define XMIT_EVERY 6*60+13
+
+
+
+
 void setup() {
   Serial.begin(4800);
 
@@ -242,23 +273,13 @@ void setup() {
 
   ENABLE_BAUD_CLK;
 
+  aw.set_gps_handler(&gpsh);
+
   dumpstate("exsetup");
+
+  char *startup_buf = ">Project Bacchus: v9.0 startup";
+  modulator.enqueue((uint8_t*)startup_buf, strlen(startup_buf));
 }
-
-
-#define XMIT_EVERY 2 // how many GPGGAs between transmits
-#define BUFLEN 100
-
-
-GPSHandler gpsh = GPSHandler();
-
-
-uint8_t gps_rx_lights = 0;
-
-uint16_t lastxmit = 0;
-
-uint16_t gpgga_seen = 0;
-#define XMIT_EVERY 6*60+13
 
 
 
@@ -268,21 +289,58 @@ void loop() {
   uint16_t curmillis = millis();
 
   if (-1 != x) {
-    Serial.print((char)x);
+    //    Serial.print((char)x);
     if (gpsh.saw(x & 0xFF)) {
 
-      gpgga_seen = (gpgga_seen + 1) % XMIT_EVERY;
+      gpgga_seen++;
 
-      if (1 == gpgga_seen) {
+      uint16_t x = analogRead(PIN_TEMP_INTERNAL);
+
+      Serial.println(x, 10);
+
+
+
+      if (XMIT_EVERY == gpgga_seen) {
+	gpgga_seen = 0;
 
 	Serial.println("==========");
 	Serial.println((char*)gpsh.buf);
 	Serial.println("==========");
 
+
+	aw.note_temp_internal( (x >> 2) & 0xFF );
+	aw.note_temp_external( (analogRead(PIN_TEMP_EXTERNAL) >> 2) & 0xFF );
+
+	// Use the +5V internal reference for the pressure sensor, as
+	// it's not a 3.3V device.  We need to add a 1.8k resistor
+	// between the AREF pin and the 3.3V rail if we want to use
+	// this trick.  On the current board rev, that requires
+	// cutting a trace.
+
+#if !USE_RAW_3V3_AREF
+	analogReference(DEFAULT);
+	analogRead(PIN_PRESSURE); // throw out two conversions
+	analogRead(PIN_PRESSURE);
+#endif
+
+	aw.note_pressure     ( analogRead(PIN_PRESSURE     ) >> 2 );
+
+#if !USE_RAW_3V3_AREF
+	analogReference(EXTERNAL);
+	analogRead(PIN_PRESSURE); // throw out two conversions
+	analogRead(PIN_PRESSURE);
+#endif
+
+
+
+
 	Serial.println( millis() );
 
+	char buf[100];
+	uint16_t len = aw.format_string(buf, 100);
+	
 	uint8_t xmit[150];
-	uint16_t pos = hdlc_frame(xmit, (const uint8_t *)gpsh.buf, gpsh.bufpos);
+	uint16_t pos = hdlc_frame(xmit, (const uint8_t *)buf, len);
 
 	gpsh.bufpos = 0;
 	modulator.enqueue(xmit, pos);
@@ -295,4 +353,5 @@ void loop() {
   if (gps_rx_lights) gps_rx_lights--;
 
   digitalWrite(7, gps_rx_lights);
+  digitalWrite(PIN_GPS_LOCK, gpsh.lock);
 }

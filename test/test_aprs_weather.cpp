@@ -53,6 +53,9 @@ SUITE(APRSWeather) {
 
       aw.note_temp_internal(255);
       CHECK(aw.temp_internal_fahrenheit() == 125);
+
+      aw.note_temp_external(231);
+      CHECK(aw.temp_external_fahrenheit() == 76);
     }
 
 
@@ -76,7 +79,7 @@ SUITE(APRSWeather) {
 
       pos = aw.format_string(buf, 1024);
 
-      const char *expected_packet = ";Bacchus 9*021700z3745.57N/12224.96WO.../...g...t002b04690bccs9";
+      const char *expected_packet = ";AJ9BM-11 *021700h3745.57N/12224.96W_.../...t002b04690";
       const uint16_t expected_len = strlen(expected_packet);
 
       CHECK(pos == expected_len);

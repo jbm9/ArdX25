@@ -1,3 +1,23 @@
+/*
+ *
+ * gps_handler.cpp: DESCRIPTION
+ *
+ * Copyright (c) 2012 Applied Platonics, LLC
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; version 2 only.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+
 #include "gps_handler.h"
 
 GPSHandler::GPSHandler() {
@@ -16,6 +36,18 @@ GPSHandler::GPSHandler() {
   altitude = -99999;
 }
 
+
+/**
+ * Submit the given character as a "seen" byte in the serial stream.
+ *
+ * This module is a little inside out: it accumulates the GPS
+ * sentences itself, in its buffer, then returns true from here when a
+ * complete GPGGA sentence is in the buf variable.
+ *
+ * @param[in] x The latest byte read from serial
+ *
+ * @returns True if there's a GPGGA sentence in this.buf, false otherwise.
+ */
 bool GPSHandler::saw(uint8_t x) {
   bool retval = false;
 
@@ -47,10 +79,15 @@ bool GPSHandler::saw(uint8_t x) {
 }
 
 
-
-
-// Note the position associated with a GPGGA statement; doesn't
-// check checksums at all.
+/**
+ * Extracts the values we care about from the given GPGGA sentence.
+ *
+ * Note that this method doesn't check the checksum or anything else
+ * helpful; it simply parses the data down to the values specified.
+ *
+ * @param[in] gpgga A NUL-terminated buffer containing our $GPGGA
+ * sentence.
+ */
 void GPSHandler::parse_gpgga(char *gpgga) {
   uint16_t new_hhmm;
   uint16_t new_lat_whole;

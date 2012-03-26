@@ -1,6 +1,6 @@
 /*
  *
- * gps_handler.cpp: DESCRIPTION
+ * gps_handler.cpp: GPS parser/storage utility class
  *
  * Copyright (c) 2012 Applied Platonics, LLC
  *

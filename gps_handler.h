@@ -1,6 +1,6 @@
 /*
  *
- * gps_handler.h: DESCRIPTION
+ * gps_handler.h:GPS parser/storage utility class
  *
  * Copyright (c) 2012 Applied Platonics, LLC
  *

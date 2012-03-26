@@ -216,7 +216,7 @@ void cycle_leds() {
 
 
 
-#define XMIT_EVERY 37 // how many GPGGAs between transmits
+#define XMIT_EVERY 5*60+37 // how many GPGGAs between transmits
 #define BUFLEN 100
 
 

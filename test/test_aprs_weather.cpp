@@ -27,7 +27,7 @@ SUITE(APRSWeather) {
 
   TEST_FIXTURE(APRSWeatherFixture, TestInitialization)
     {
-      CHECK(!aw.gpsh->lock);
+      CHECK(!gpsh.lock);
     }
 
   TEST_FIXTURE(APRSWeatherFixture, TestBytewiseIngestionSimple)
@@ -36,13 +36,14 @@ SUITE(APRSWeather) {
       int i;
 
       for (i = 0; i < strlen(gpgga)-1; i++) {
-	CHECK(!aw.gpsh->saw(gpgga[i]));
+	CHECK(!gpsh.saw(gpgga[i]));
       }
-      CHECK(aw.gpsh->saw(gpgga[i]));
+      CHECK(gpsh.saw(gpgga[i]));
     }
 
   TEST_FIXTURE(APRSWeatherFixture, TestTemperatures)
     {
+#if USE_RAW_3V3_AREF
       aw.note_temp_internal(199);
       aw.note_temp_external(150);
       CHECK(aw.temp_internal_fahrenheit() == 2);
@@ -56,7 +57,31 @@ SUITE(APRSWeather) {
 
       aw.note_temp_external(231);
       CHECK(aw.temp_external_fahrenheit() == 76);
+#else
+      aw.note_temp_internal(199);
+      aw.note_temp_external(150);
+      CHECK(aw.temp_internal_fahrenheit() == -18);
+      CHECK(aw.temp_external_fahrenheit() == -126);
+
+      aw.note_temp_internal(252);
+      CHECK(aw.temp_internal_fahrenheit() == 98);
+
+      aw.note_temp_internal(255);
+      CHECK(aw.temp_internal_fahrenheit() == 104);
+
+      aw.note_temp_external(231);
+      CHECK(aw.temp_external_fahrenheit() == 51);
+#endif
     }
+
+
+  TEST_FIXTURE(APRSWeatherFixture, TestPressure) {
+    aw.note_pressure(140);
+    CHECK(aw.pressure_millibars() == 700);
+    aw.note_pressure(219);
+    CHECK(aw.pressure_millibars() == 1040);
+    
+  }
 
 
   TEST_FIXTURE(APRSWeatherFixture, TestFormatString)
@@ -69,24 +94,21 @@ SUITE(APRSWeather) {
       int i;
 
       for (i = 0; i < strlen(gpgga)-1; i++) {
-	CHECK(!aw.gpsh->saw(gpgga[i]));
+	CHECK(!gpsh.saw(gpgga[i]));
       }
-      CHECK(aw.gpsh->saw(gpgga[i]));
+      CHECK(gpsh.saw(gpgga[i]));
 
 
-      aw.note_temp_external(199);
+      aw.note_temp_external(231);
       aw.note_pressure(140);
 
       pos = aw.format_string(buf, 1024);
 
-      const char *expected_packet = ";AJ9BM-11 *021700h3745.57N/12224.96W_.../...t002b04690";
+      const char *expected_packet = ";AJ9BM-11 *021700h3745.57N/12224.96W_.../...t051b07000";
       const uint16_t expected_len = strlen(expected_packet);
 
       CHECK(pos == expected_len);
       CHECK(0 == strncmp(expected_packet, buf, expected_len));
-
-      printf("hi mom\n");
-
     }
 
 }

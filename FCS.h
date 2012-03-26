@@ -1,21 +1,14 @@
-/* -*- mode: c -*- vim:set ft=c ts=2 sw=2 ai: */
-
-/* *******************************************************************
-
-   ArdPRS -- Softmodem AFSK1200/APRS transmit for AVR/Arduino
-
-   Copyright (c) 2010 Josh Myer <josh@appliedplatonics.com>
-   Released under the terms of the GPLv2
-
-   FCS.h -- Frame Check Sum implementation interface.
-
-   This implements a checksum algorithm used by the HDLC framing
-   for AFSK.
-
-   This is based primarily on code in the public domain; feel free to
-   consider this file in the public domain as well.
-
-   *******************************************************************/
+/*
+ *
+ * FCS.h: Frame Check Sum implementation interface.
+ * 
+ * This implements a checksum algorithm used by the HDLC framing
+ * for AFSK.
+ *
+ *  This is based primarily on code in the public domain; feel free to
+ *  consider this file in the public domain as well.
+ *
+ *******************************************************************/
 
 
 #ifndef _FCS_H_
